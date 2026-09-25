@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>IPA Inspector</title>
+    <title>IPA .app Reader</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -68,8 +68,7 @@
             display: block;
         }
 
-        /* Card de Informações do App */
-        #info-container {
+        #result-container {
             display: none;
             width: 100%;
             max-width: 400px;
@@ -82,28 +81,52 @@
             box-sizing: border-box;
         }
 
-        .info-row {
+        .app-header-view {
             display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
+            align-items: center;
+            margin-bottom: 15px;
             border-bottom: 0.5px solid var(--border);
-            font-size: 14px;
+            padding-bottom: 15px;
         }
 
-        .info-row:last-child {
-            border-bottom: none;
+        #appIconImg {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            background: #2c2c2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            object-fit: cover;
         }
 
-        .info-label {
-            color: var(--text-sec);
+        .app-meta {
+            margin-left: 15px;
         }
 
-        .info-value {
+        .app-name-title {
+            font-size: 18px;
             font-weight: 600;
-            color: var(--text);
-            word-break: break-all;
-            text-align: right;
-            max-width: 200px;
+            margin: 0 0 4px 0;
+        }
+
+        .app-sub {
+            font-size: 13px;
+            color: var(--text-sec);
+            margin: 0;
+        }
+
+        .file-list {
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: var(--text-sec);
+            background: #000;
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+            border: 0.5px solid var(--border);
         }
 
         #status {
@@ -120,83 +143,93 @@
 </head>
 <body>
 
-    <h2>IPA Inspector</h2>
-    <p>Adicione o .ipa para inspecionar o pacote</p>
+    <h2>Leitor de IPA (.app)</h2>
+    <p>Carregue o pacote para ler os arquivos internos</p>
 
     <div class="upload-box" onclick="document.getElementById('ipaInput').click()">
-        <span style="font-size: 32px;">📦</span>
+        <span style="font-size: 32px;">📱</span>
         <span class="upload-btn-text">Selecionar arquivo .ipa</span>
-        <input type="file" id="ipaInput" accept=".ipa" onchange="processarIpa(event)">
+        <input type="file" id="ipaInput" accept=".ipa" onchange="lerAppInterno(event)">
     </div>
 
     <div id="status"></div>
 
-    <!-- Painel com os dados do IPA -->
-    <div id="info-container">
-        <div class="info-row">
-            <span class="info-label">Arquivo:</span>
-            <span class="info-value" id="valName">-</span>
+    <div id="result-container">
+        <div class="app-header-view">
+            <div id="appIconImg">📦</div>
+            <div class="app-meta">
+                <div class="app-name-title" id="appNameTitle">App Nativo</div>
+                <div class="app-sub" id="appFolderName">-</div>
+            </div>
         </div>
-        <div class="info-row">
-            <span class="info-label">Tamanho:</span>
-            <span class="info-value" id="valSize">-</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">AppName (.app):</span>
-            <span class="info-value" id="valApp">-</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Status:</span>
-            <span class="info-value" style="color: #34c759;">Lido com Sucesso</span>
-        </div>
+        <div style="font-size: 13px; color: var(--text-sec); margin-bottom: 5px;">Estrutura interna encontrada:</div>
+        <div class="file-list" id="fileListContent"></div>
     </div>
 
     <script>
-        async function processarIpa(event) {
+        async function lerAppInterno(event) {
             const file = event.target.files[0];
             const statusDiv = document.getElementById('status');
-            const infoContainer = document.getElementById('info-container');
-            
-            const valName = document.getElementById('valName');
-            const valSize = document.getElementById('valSize');
-            const valApp = document.getElementById('valApp');
+            const resultContainer = document.getElementById('result-container');
+            const appFolderNameElem = document.getElementById('appFolderName');
+            const appNameTitle = document.getElementById('appNameTitle');
+            const fileListContent = document.getElementById('fileListContent');
+            const appIconImg = document.getElementById('appIconImg');
 
             if (!file) return;
 
-            statusDiv.innerHTML = "Lendo estrutura interna do IPA...";
-            infoContainer.style.display = 'none';
+            statusDiv.innerHTML = "Lendo pacote .app interno...";
+            resultContainer.style.display = 'none';
 
             try {
                 const zip = new JSZip();
                 const zipContent = await zip.loadAsync(file);
 
-                let appFolderName = "Não encontrado";
+                let appPathPrefix = null;
+                let folderName = "";
+                let arquivosInternos = [];
 
-                // Procura a pasta principal do aplicativo nativo dentro do Payload
+                // Varre o arquivo ZIP para achar a pasta .app dentro de Payload
                 for (let filename of Object.keys(zipContent.files)) {
-                    if (filename.includes('Payload/') && filename.endsWith('.app/')) {
-                        const parts = filename.split('/');
-                        for (let p of parts) {
-                            if (p.endsWith('.app')) {
-                                appFolderName = p;
-                                break;
-                            }
+                    if (filename.includes('Payload/') && filename.includes('.app/')) {
+                        let parts = filename.split('/');
+                        let appIndex = parts.findIndex(p => p.endsWith('.app'));
+                        if (appIndex !== -1) {
+                            folderName = parts[appIndex];
+                            appPathPrefix = parts.slice(0, appIndex + 1).join('/') + '/';
+                            break;
                         }
-                        break;
                     }
                 }
 
-                // Preenche os dados na tela
-                valName.innerText = file.name;
-                valSize.innerText = (file.size / (1024 * 1024)).toFixed(2) + " MB";
-                valApp.innerText = appFolderName;
+                if (appPathPrefix) {
+                    appNameTitle.innerText = folderName.replace('.app', '');
+                    appFolderNameElem.innerText = folderName;
 
-                statusDiv.innerHTML = "✅ Pacote inspecionado com sucesso!";
-                infoContainer.style.display = 'block';
+                    // Coleta uma lista dos arquivos de dentro do .app para exibir
+                    for (let filename of Object.keys(zipContent.files)) {
+                        if (filename.startsWith(appPathPrefix)) {
+                            let relPath = filename.replace(appPathPrefix, '');
+                            if (relPath.length > 0) {
+                                arquivosInternos.push(relPath);
+                            }
+                        }
+                    }
+
+                    fileListContent.innerHTML = arquivosInternos.slice(0, 50).join('<br>');
+                    if (arquivosInternos.length > 50) {
+                        fileListContent.innerHTML += `<br><em>...e mais ${arquivosInternos.length - 50} arquivos.</em>`;
+                    }
+
+                    statusDiv.innerHTML = "✅ Pasta .app lida com sucesso!";
+                    resultContainer.style.display = 'block';
+                } else {
+                    statusDiv.innerHTML = "⚠️ Estrutura .app não localizada no formato padrão.";
+                }
 
             } catch (error) {
                 console.error(error);
-                statusDiv.innerHTML = "❌ Erro ao ler o arquivo IPA.";
+                statusDiv.innerHTML = "❌ Erro ao processar o pacote.";
             }
         }
     </script>
