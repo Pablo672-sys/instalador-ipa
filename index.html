@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>IPA Web Runner</title>
+    <title>IPA Inspector</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -54,11 +54,6 @@
             text-align: center;
             box-sizing: border-box;
             cursor: pointer;
-            transition: border-color 0.2s;
-        }
-
-        .upload-box:active {
-            border-color: var(--blue);
         }
 
         input[type="file"] {
@@ -73,25 +68,42 @@
             display: block;
         }
 
-        /* Tela onde o app roda */
-        #runner-container {
+        /* Card de Informações do App */
+        #info-container {
             display: none;
             width: 100%;
             max-width: 400px;
-            height: 600px;
-            background: #fff;
-            border-radius: 24px;
-            overflow: hidden;
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
             margin-top: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             border: 1px solid var(--border);
-            position: relative;
+            box-sizing: border-box;
         }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 0.5px solid var(--border);
+            font-size: 14px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-sec);
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-all;
+            text-align: right;
+            max-width: 200px;
         }
 
         #status {
@@ -103,73 +115,88 @@
         }
     </style>
 
-    <!-- Biblioteca para ler o arquivo IPA por dentro -->
+    <!-- Biblioteca JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
-    <h2>IPA Web Runner</h2>
-    <p>Adicione o seu .ipa para rodar direto na tela</p>
+    <h2>IPA Inspector</h2>
+    <p>Adicione o .ipa para inspecionar o pacote</p>
 
-    <!-- Caixa de Upload Estilizada -->
     <div class="upload-box" onclick="document.getElementById('ipaInput').click()">
-        <span style="font-size: 32px;">📁</span>
+        <span style="font-size: 32px;">📦</span>
         <span class="upload-btn-text">Selecionar arquivo .ipa</span>
         <input type="file" id="ipaInput" accept=".ipa" onchange="processarIpa(event)">
     </div>
 
     <div id="status"></div>
 
-    <!-- Container do App Rodando -->
-    <div id="runner-container">
-        <iframe id="appFrame"></iframe>
+    <!-- Painel com os dados do IPA -->
+    <div id="info-container">
+        <div class="info-row">
+            <span class="info-label">Arquivo:</span>
+            <span class="info-value" id="valName">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Tamanho:</span>
+            <span class="info-value" id="valSize">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">AppName (.app):</span>
+            <span class="info-value" id="valApp">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Status:</span>
+            <span class="info-value" style="color: #34c759;">Lido com Sucesso</span>
+        </div>
     </div>
 
     <script>
         async function processarIpa(event) {
             const file = event.target.files[0];
             const statusDiv = document.getElementById('status');
-            const container = document.getElementById('runner-container');
-            const appFrame = document.getElementById('appFrame');
+            const infoContainer = document.getElementById('info-container');
+            
+            const valName = document.getElementById('valName');
+            const valSize = document.getElementById('valSize');
+            const valApp = document.getElementById('valApp');
 
             if (!file) return;
 
-            statusDiv.innerHTML = "Lendo pacote IPA...";
-            container.style.display = 'none';
+            statusDiv.innerHTML = "Lendo estrutura interna do IPA...";
+            infoContainer.style.display = 'none';
 
             try {
-                // O IPA é processado como um pacote compactado
                 const zip = new JSZip();
                 const zipContent = await zip.loadAsync(file);
 
-                statusDiv.innerHTML = "Extraindo conteúdo interno...";
+                let appFolderName = "Não encontrado";
 
-                let htmlFileKey = null;
-
-                // Varre os arquivos internos do IPA procurando pelo arquivo principal do app
+                // Procura a pasta principal do aplicativo nativo dentro do Payload
                 for (let filename of Object.keys(zipContent.files)) {
-                    if (filename.endsWith('.html') || filename.endsWith('.htm')) {
-                        htmlFileKey = filename;
+                    if (filename.includes('Payload/') && filename.endsWith('.app/')) {
+                        const parts = filename.split('/');
+                        for (let p of parts) {
+                            if (p.endsWith('.app')) {
+                                appFolderName = p;
+                                break;
+                            }
+                        }
                         break;
                     }
                 }
 
-                if (htmlFileKey) {
-                    statusDiv.innerHTML = "🚀 App carregado com sucesso!";
-                    
-                    // Extrai o arquivo e joga para rodar no player
-                    const fileData = await zipContent.files[htmlFileKey].async("blob");
-                    const appUrl = URL.createObjectURL(fileData);
+                // Preenche os dados na tela
+                valName.innerText = file.name;
+                valSize.innerText = (file.size / (1024 * 1024)).toFixed(2) + " MB";
+                valApp.innerText = appFolderName;
 
-                    appFrame.src = appUrl;
-                    container.style.display = 'block';
-                } else {
-                    statusDiv.innerHTML = "✅ Pacote lido! (Nota: Se o app for nativo puro em código compilado, certifique-se de usar pacotes empacotados para web/HTML5).";
-                }
+                statusDiv.innerHTML = "✅ Pacote inspecionado com sucesso!";
+                infoContainer.style.display = 'block';
 
             } catch (error) {
                 console.error(error);
-                statusDiv.innerHTML = "❌ Erro ao processar o arquivo.";
+                statusDiv.innerHTML = "❌ Erro ao ler o arquivo IPA.";
             }
         }
     </script>
