@@ -3,137 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Emulador IPA Web</title>
+    <title>IPA Web Runner</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Emulador">
-    
+
     <style>
+        :root {
+            --bg: #000000;
+            --card: #1c1c1e;
+            --border: #38383a;
+            --blue: #0a84ff;
+            --text: #ffffff;
+            --text-sec: #8e8e93;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #0b0b0e;
-            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             margin: 0;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-        }
-        h1 { font-size: 20px; margin-bottom: 5px; }
-        p { color: #888; font-size: 13px; margin-bottom: 20px; text-align: center; }
-        
-        .upload-card {
-            background: #16161a;
-            border: 1px solid #2a2a33;
-            padding: 20px;
-            border-radius: 15px;
-            width: 100%;
-            max-width: 350px;
+            min-height: 100vh;
             box-sizing: border-box;
-            margin-bottom: 20px;
-        }
-        input[type="file"] {
-            width: 100%;
-            color: #ccc;
-            font-size: 13px;
         }
 
-        /* O "Visual de Aparelho / Emulador" */
-        #emulator-container {
+        h2 {
+            font-size: 22px;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+
+        p {
+            color: var(--text-sec);
+            font-size: 14px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .upload-box {
+            background-color: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 30px 20px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .upload-box:active {
+            border-color: var(--blue);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-btn-text {
+            color: var(--blue);
+            font-weight: 600;
+            font-size: 16px;
+            margin-top: 10px;
+            display: block;
+        }
+
+        /* Tela onde o app roda */
+        #runner-container {
             display: none;
             width: 100%;
-            max-width: 350px;
-            height: 550px;
-            background: #000;
-            border: 4px solid #333;
-            border-radius: 30px;
+            max-width: 400px;
+            height: 600px;
+            background: #fff;
+            border-radius: 24px;
             overflow: hidden;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid var(--border);
             position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
+
         iframe {
             width: 100%;
             height: 100%;
             border: none;
-            background: #fff;
         }
-        .loading {
-            color: #00ff88;
+
+        #status {
+            margin-top: 15px;
             font-size: 14px;
-            margin-top: 10px;
-            font-weight: bold;
+            font-weight: 500;
+            color: #34c759;
+            text-align: center;
         }
     </style>
-    
-    <!-- Biblioteca JSZip para abrir o arquivo IPA por dentro do navegador -->
+
+    <!-- Biblioteca para ler o arquivo IPA por dentro -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
-    <h1>Emulador Web de IPA</h1>
-    <p>Selecione o .ipa para carregar e rodar direto no navegador</p>
+    <h2>IPA Web Runner</h2>
+    <p>Adicione o seu .ipa para rodar direto na tela</p>
 
-    <div class="upload-card">
-        <label><b>Selecione o arquivo .ipa:</b></label>
-        <input type="file" id="ipaFile" accept=".ipa" onchange="carregarIpa(event)">
-        <div id="status" class="loading"></div>
+    <!-- Caixa de Upload Estilizada -->
+    <div class="upload-box" onclick="document.getElementById('ipaInput').click()">
+        <span style="font-size: 32px;">📁</span>
+        <span class="upload-btn-text">Selecionar arquivo .ipa</span>
+        <input type="file" id="ipaInput" accept=".ipa" onchange="processarIpa(event)">
     </div>
 
-    <!-- Tela do Emulador -->
-    <div id="emulator-container">
+    <div id="status"></div>
+
+    <!-- Container do App Rodando -->
+    <div id="runner-container">
         <iframe id="appFrame"></iframe>
     </div>
 
     <script>
-        async function carregarIpa(event) {
+        async function processarIpa(event) {
             const file = event.target.files[0];
             const statusDiv = document.getElementById('status');
-            const emulatorBox = document.getElementById('emulator-container');
+            const container = document.getElementById('runner-container');
             const appFrame = document.getElementById('appFrame');
 
             if (!file) return;
 
-            statusDiv.innerHTML = "Lendo estrutura do .ipa...";
-            emulatorBox.style.display = 'none';
+            statusDiv.innerHTML = "Lendo pacote IPA...";
+            container.style.display = 'none';
 
             try {
-                // Como o IPA é um arquivo compactado ZIP, nós lemos ele por dentro
+                // O IPA é processado como um pacote compactado
                 const zip = new JSZip();
                 const zipContent = await zip.loadAsync(file);
 
-                statusDiv.innerHTML = "Procurando arquivos executáveis/web...";
+                statusDiv.innerHTML = "Extraindo conteúdo interno...";
 
-                // Otimização: O emulador busca por arquivos HTML/App dentro do pacote
                 let htmlFileKey = null;
-                
-                // Varre os arquivos internos do IPA
-                let filesKeys = Object.keys(zipContent.files);
-                for (let key of filesKeys) {
-                    if (key.endsWith('.html') || key.endsWith('.htm')) {
-                        htmlFileKey = key;
+
+                // Varre os arquivos internos do IPA procurando pelo arquivo principal do app
+                for (let filename of Object.keys(zipContent.files)) {
+                    if (filename.endsWith('.html') || filename.endsWith('.htm')) {
+                        htmlFileKey = filename;
                         break;
                     }
                 }
 
                 if (htmlFileKey) {
-                    statusDiv.innerHTML = "Carregando o app no emulador...";
+                    statusDiv.innerHTML = "🚀 App carregado com sucesso!";
                     
-                    // Extrai o conteúdo do arquivo principal do app
+                    // Extrai o arquivo e joga para rodar no player
                     const fileData = await zipContent.files[htmlFileKey].async("blob");
                     const appUrl = URL.createObjectURL(fileData);
 
-                    // Joga o app para rodar dentro do iframe (o visual de emulador)
                     appFrame.src = appUrl;
-                    emulatorBox.style.display = 'block';
-                    statusDiv.innerHTML = "✅ App rodando no emulador com sucesso!";
+                    container.style.display = 'block';
                 } else {
-                    statusDiv.innerHTML = "⚠️ Este .ipa é nativo puro (Binário iOS/Swift). O navegador roda pacotes web HTML5. Se for um app web empacotado, ele vai rodar aqui dentro!";
+                    statusDiv.innerHTML = "✅ Pacote lido! (Nota: Se o app for nativo puro em código compilado, certifique-se de usar pacotes empacotados para web/HTML5).";
                 }
 
             } catch (error) {
                 console.error(error);
-                statusDiv.innerHTML = "❌ Erro ao ler o arquivo IPA.";
+                statusDiv.innerHTML = "❌ Erro ao processar o arquivo.";
             }
         }
     </script>
