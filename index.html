@@ -3,136 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Instalador IPA</title>
+    <title>Emulador IPA Web</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Instalador">
+    <meta name="apple-mobile-web-app-title" content="Emulador">
     
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #0b0b0e;
             color: #ffffff;
-            text-align: center;
-            padding: 40px 20px;
             margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        h1 { font-size: 24px; margin-bottom: 5px; }
-        p { color: #888; font-size: 14px; margin-bottom: 25px; }
-        .card {
+        h1 { font-size: 20px; margin-bottom: 5px; }
+        p { color: #888; font-size: 13px; margin-bottom: 20px; text-align: center; }
+        
+        .upload-card {
             background: #16161a;
             border: 1px solid #2a2a33;
-            padding: 25px;
-            border-radius: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-            text-align: left;
-        }
-        label { font-size: 14px; color: #aaa; }
-        input[type="file"] {
-            display: block;
-            margin-top: 10px;
-            color: #ccc;
-            font-size: 14px;
-            width: 100%;
-        }
-        button {
-            background: linear-gradient(135deg, #007aff, #0056b3);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            font-size: 16px;
-            font-weight: bold;
+            padding: 20px;
             border-radius: 15px;
             width: 100%;
-            cursor: pointer;
-            margin-top: 10px;
-            box-shadow: 0 4px 15px rgba(0,122,255,0.4);
+            max-width: 350px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
         }
-        button:active { transform: scale(0.98); }
-        #status {
-            margin-top: 20px;
-            font-size: 15px;
-            color: #00ff88;
-            font-weight: bold;
-            line-height: 1.5;
-        }
-        .progress-container {
+        input[type="file"] {
             width: 100%;
-            background: #2a2a33;
-            border-radius: 10px;
-            margin-top: 20px;
-            overflow: hidden;
-            display: none;
+            color: #ccc;
+            font-size: 13px;
         }
-        .progress-bar {
-            width: 0%;
-            height: 10px;
-            background: #00ff88;
-            transition: width 0.4s ease;
+
+        /* O "Visual de Aparelho / Emulador" */
+        #emulator-container {
+            display: none;
+            width: 100%;
+            max-width: 350px;
+            height: 550px;
+            background: #000;
+            border: 4px solid #333;
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #fff;
+        }
+        .loading {
+            color: #00ff88;
+            font-size: 14px;
+            margin-top: 10px;
+            font-weight: bold;
         }
     </style>
+    
+    <!-- Biblioteca JSZip para abrir o arquivo IPA por dentro do navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
-    <h1>Instalador IPA</h1>
-    <p>Selecione o arquivo e execute o processo</p>
+    <h1>Emulador Web de IPA</h1>
+    <p>Selecione o .ipa para carregar e rodar direto no navegador</p>
 
-    <div class="card">
-        <label for="arquivoIpa"><b>Arquivo .ipa selecionado:</b></label>
-        <input type="file" id="arquivoIpa" accept=".ipa">
+    <div class="upload-card">
+        <label><b>Selecione o arquivo .ipa:</b></label>
+        <input type="file" id="ipaFile" accept=".ipa" onchange="carregarIpa(event)">
+        <div id="status" class="loading"></div>
     </div>
 
-    <button onclick="executarForçado()">Executar Instalação</button>
-
-    <div class="progress-container" id="progressBox">
-        <div class="progress-bar" id="progressBar"></div>
+    <!-- Tela do Emulador -->
+    <div id="emulator-container">
+        <iframe id="appFrame"></iframe>
     </div>
-
-    <div id="status"></div>
 
     <script>
-        function executarForçado() {
-            const input = document.getElementById('arquivoIpa');
+        async function carregarIpa(event) {
+            const file = event.target.files[0];
             const statusDiv = document.getElementById('status');
-            const progressBox = document.getElementById('progressBox');
-            const progressBar = document.getElementById('progressBar');
+            const emulatorBox = document.getElementById('emulator-container');
+            const appFrame = document.getElementById('appFrame');
 
-            if (input.files.length === 0) {
-                alert('Selecione um arquivo .ipa!');
-                return;
+            if (!file) return;
+
+            statusDiv.innerHTML = "Lendo estrutura do .ipa...";
+            emulatorBox.style.display = 'none';
+
+            try {
+                // Como o IPA é um arquivo compactado ZIP, nós lemos ele por dentro
+                const zip = new JSZip();
+                const zipContent = await zip.loadAsync(file);
+
+                statusDiv.innerHTML = "Procurando arquivos executáveis/web...";
+
+                // Otimização: O emulador busca por arquivos HTML/App dentro do pacote
+                let htmlFileKey = null;
+                
+                // Varre os arquivos internos do IPA
+                let filesKeys = Object.keys(zipContent.files);
+                for (let key of filesKeys) {
+                    if (key.endsWith('.html') || key.endsWith('.htm')) {
+                        htmlFileKey = key;
+                        break;
+                    }
+                }
+
+                if (htmlFileKey) {
+                    statusDiv.innerHTML = "Carregando o app no emulador...";
+                    
+                    // Extrai o conteúdo do arquivo principal do app
+                    const fileData = await zipContent.files[htmlFileKey].async("blob");
+                    const appUrl = URL.createObjectURL(fileData);
+
+                    // Joga o app para rodar dentro do iframe (o visual de emulador)
+                    appFrame.src = appUrl;
+                    emulatorBox.style.display = 'block';
+                    statusDiv.innerHTML = "✅ App rodando no emulador com sucesso!";
+                } else {
+                    statusDiv.innerHTML = "⚠️ Este .ipa é nativo puro (Binário iOS/Swift). O navegador roda pacotes web HTML5. Se for um app web empacotado, ele vai rodar aqui dentro!";
+                }
+
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerHTML = "❌ Erro ao ler o arquivo IPA.";
             }
-
-            const arquivo = input.files[0];
-            
-            progressBar.style.width = '0%';
-            progressBox.style.display = 'block';
-            statusDiv.innerHTML = `Lendo ${arquivo.name}...`;
-
-            setTimeout(() => {
-                progressBar.style.width = '50%';
-                statusDiv.innerHTML = `Processando pacote...`;
-            }, 800);
-
-            setTimeout(() => {
-                progressBar.style.width = '100%';
-                statusDiv.innerHTML = `⚡ Processo concluído! Disparando arquivo...`;
-
-                // Força o gatilho de download programaticamente via JavaScript
-                const url = URL.createObjectURL(arquivo);
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute('download', arquivo.name);
-                document.body.appendChild(link);
-                link.click();
-
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                }, 150);
-
-            }, 2000);
         }
     </script>
 
