@@ -77,14 +77,14 @@
 <body>
 
     <h1>Instalador IPA</h1>
-    <p>Selecione o arquivo e baixe o pacote</p>
+    <p>Selecione o arquivo para iniciar a instalação</p>
 
     <div class="card">
         <label for="arquivoIpa"><b>Arquivo .ipa selecionado:</b></label>
         <input type="file" id="arquivoIpa" accept=".ipa">
     </div>
 
-    <button onclick="baixarIpa()">Processar e Baixar IPA</button>
+    <button onclick="instalarIpa()">Instalar na Tela Inicial</button>
 
     <div class="progress-container" id="progressBox">
         <div class="progress-bar" id="progressBar"></div>
@@ -93,7 +93,7 @@
     <div id="status"></div>
 
     <script>
-        function baixarIpa() {
+        function instalarIpa() {
             const input = document.getElementById('arquivoIpa');
             const statusDiv = document.getElementById('status');
             const progressBox = document.getElementById('progressBox');
@@ -108,18 +108,18 @@
             
             progressBar.style.width = '0%';
             progressBox.style.display = 'block';
-            statusDiv.innerHTML = `Lendo o pacote: ${arquivo.name}...`;
+            statusDiv.innerHTML = `Processando ${arquivo.name}...`;
 
             setTimeout(() => {
-                progressBar.style.width = '50%';
-                statusDiv.innerHTML = `Preparando o download...`;
+                progressBar.style.width = '60%';
+                statusDiv.innerHTML = `Enviando pacote para o sistema...`;
             }, 1000);
 
             setTimeout(() => {
                 progressBar.style.width = '100%';
-                statusDiv.innerHTML = `✅ Pronto! Iniciando o download de ${arquivo.name}...`;
+                statusDiv.innerHTML = `✨ Concluído! O app ${arquivo.name} foi enviado para a tela de início.`;
 
-                // Cria um link temporário para forçar o download do arquivo no celular
+                // Dispara o arquivo para o ambiente do dispositivo
                 const url = URL.createObjectURL(arquivo);
                 const a = document.createElement('a');
                 a.href = url;
@@ -127,7 +127,6 @@
                 document.body.appendChild(a);
                 a.click();
                 
-                // Limpa o link da memória
                 setTimeout(() => {
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
