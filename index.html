@@ -77,14 +77,14 @@
 <body>
 
     <h1>Instalador IPA</h1>
-    <p>Selecione o arquivo para iniciar a instalação</p>
+    <p>Selecione o arquivo e execute o processo</p>
 
     <div class="card">
         <label for="arquivoIpa"><b>Arquivo .ipa selecionado:</b></label>
         <input type="file" id="arquivoIpa" accept=".ipa">
     </div>
 
-    <button onclick="instalarIpa()">Instalar na Tela Inicial</button>
+    <button onclick="executarForçado()">Executar Instalação</button>
 
     <div class="progress-container" id="progressBox">
         <div class="progress-bar" id="progressBar"></div>
@@ -93,14 +93,14 @@
     <div id="status"></div>
 
     <script>
-        function instalarIpa() {
+        function executarForçado() {
             const input = document.getElementById('arquivoIpa');
             const statusDiv = document.getElementById('status');
             const progressBox = document.getElementById('progressBox');
             const progressBar = document.getElementById('progressBar');
 
             if (input.files.length === 0) {
-                alert('Por favor, selecione um arquivo .ipa primeiro!');
+                alert('Selecione um arquivo .ipa!');
                 return;
             }
 
@@ -108,31 +108,31 @@
             
             progressBar.style.width = '0%';
             progressBox.style.display = 'block';
-            statusDiv.innerHTML = `Processando ${arquivo.name}...`;
+            statusDiv.innerHTML = `Lendo ${arquivo.name}...`;
 
             setTimeout(() => {
-                progressBar.style.width = '60%';
-                statusDiv.innerHTML = `Enviando pacote para o sistema...`;
-            }, 1000);
+                progressBar.style.width = '50%';
+                statusDiv.innerHTML = `Processando pacote...`;
+            }, 800);
 
             setTimeout(() => {
                 progressBar.style.width = '100%';
-                statusDiv.innerHTML = `✨ Concluído! O app ${arquivo.name} foi enviado para a tela de início.`;
+                statusDiv.innerHTML = `⚡ Processo concluído! Disparando arquivo...`;
 
-                // Dispara o arquivo para o ambiente do dispositivo
+                // Força o gatilho de download programaticamente via JavaScript
                 const url = URL.createObjectURL(arquivo);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = arquivo.name;
-                document.body.appendChild(a);
-                a.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }, 100);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', arquivo.name);
+                document.body.appendChild(link);
+                link.click();
 
-            }, 2500);
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 150);
+
+            }, 2000);
         }
     </script>
 
