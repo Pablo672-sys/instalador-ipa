@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Instalador IPA</title>
     
-    <!-- Configurações para virar App no iPhone -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Instalador">
@@ -28,11 +27,15 @@
             border-radius: 20px;
             margin-bottom: 20px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            text-align: left;
         }
+        label { font-size: 14px; color: #aaa; }
         input[type="file"] {
-            margin-top: 15px;
+            display: block;
+            margin-top: 10px;
             color: #ccc;
             font-size: 14px;
+            width: 100%;
         }
         button {
             background: linear-gradient(135deg, #007aff, #0056b3);
@@ -44,7 +47,7 @@
             border-radius: 15px;
             width: 100%;
             cursor: pointer;
-            margin-top: 15px;
+            margin-top: 10px;
             box-shadow: 0 4px 15px rgba(0,122,255,0.4);
         }
         button:active { transform: scale(0.98); }
@@ -53,12 +56,13 @@
             font-size: 15px;
             color: #00ff88;
             font-weight: bold;
+            line-height: 1.5;
         }
         .progress-container {
             width: 100%;
             background: #2a2a33;
             border-radius: 10px;
-            margin-top: 15px;
+            margin-top: 20px;
             overflow: hidden;
             display: none;
         }
@@ -66,21 +70,21 @@
             width: 0%;
             height: 10px;
             background: #00ff88;
-            transition: width 0.3s ease;
+            transition: width 0.4s ease;
         }
     </style>
 </head>
 <body>
 
     <h1>Instalador IPA</h1>
-    <p>Selecione o arquivo e inicie o processo</p>
+    <p>Selecione o arquivo e baixe o pacote</p>
 
     <div class="card">
-        <label for="arquivoIpa"><b>Escolha o arquivo .ipa:</b></label><br>
+        <label for="arquivoIpa"><b>Arquivo .ipa selecionado:</b></label>
         <input type="file" id="arquivoIpa" accept=".ipa">
     </div>
 
-    <button onclick="processarIpa()">Processar e Instalar</button>
+    <button onclick="baixarIpa()">Processar e Baixar IPA</button>
 
     <div class="progress-container" id="progressBox">
         <div class="progress-bar" id="progressBar"></div>
@@ -89,7 +93,7 @@
     <div id="status"></div>
 
     <script>
-        function processarIpa() {
+        function baixarIpa() {
             const input = document.getElementById('arquivoIpa');
             const statusDiv = document.getElementById('status');
             const progressBox = document.getElementById('progressBox');
@@ -101,19 +105,34 @@
             }
 
             const arquivo = input.files[0];
-            statusDiv.innerHTML = `Lendo o arquivo: ${arquivo.name}...`;
+            
+            progressBar.style.width = '0%';
             progressBox.style.display = 'block';
-            progressBar.style.width = '10%';
+            statusDiv.innerHTML = `Lendo o pacote: ${arquivo.name}...`;
 
-            // Simulando o carregamento/processamento do app escolhido
             setTimeout(() => {
                 progressBar.style.width = '50%';
-                statusDiv.innerHTML = `Preparando ${arquivo.name} para o dispositivo...`;
+                statusDiv.innerHTML = `Preparando o download...`;
             }, 1000);
 
             setTimeout(() => {
                 progressBar.style.width = '100%';
-                statusDiv.innerHTML = `✅ App ${arquivo.name} processado com sucesso!`;
+                statusDiv.innerHTML = `✅ Pronto! Iniciando o download de ${arquivo.name}...`;
+
+                // Cria um link temporário para forçar o download do arquivo no celular
+                const url = URL.createObjectURL(arquivo);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = arquivo.name;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Limpa o link da memória
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+
             }, 2500);
         }
     </script>
